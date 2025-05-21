@@ -27,8 +27,25 @@ class FoodTile extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Image.asset(height: 80, width: 80, product.imageUrl),
-                SizedBox(height: 10,),
+                // Updated Image handling
+                SizedBox( // Constrain image size
+                  height: 80,
+                  width: 80,
+                  child: product.imageUrl.startsWith('http')
+                      ? Image.network(
+                          product.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Image.asset('assets/images/default.png', fit: BoxFit.cover), // Fallback
+                        )
+                      : Image.asset(
+                          product.imageUrl, // Assuming it could be a local asset path
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Image.asset('assets/images/default.png', fit: BoxFit.cover), // Fallback
+                        ),
+                ),
+                const SizedBox(height: 10,),
                 Text(
                   product.name,
                   style: GoogleFonts.dmSerifDisplay(
@@ -36,15 +53,17 @@ class FoodTile extends StatelessWidget {
                     color: Colors.black,
                     fontWeight: FontWeight.w200
                   ),
+                  maxLines: 1, // Prevent long names from breaking layout
+                  overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(height: 10,),
+                const SizedBox(height: 10,),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("\$" + product.price, style: TextStyle(fontWeight: FontWeight.bold),),
+                    Text("\$${product.price.toStringAsFixed(2)}", style: const TextStyle(fontWeight: FontWeight.bold),), // Updated price
                     Row(children: [
-                      Icon(Icons.star, color: starClr, size: 18,),
-                      SizedBox(width: 5,),
+                      const Icon(Icons.star, color: starClr, size: 18,),
+                      const SizedBox(width: 5,),
                       Text(product.rating)
                     ],)
                   ],

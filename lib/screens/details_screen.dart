@@ -33,17 +33,56 @@ class _DetiaslScreenState extends State<DetiaslScreen> {
     });
   }
 
-  void addToCartt(BuildContext context) {
-
-    if(quantity > 0){
-    final shop = context.read<Shop>();
-    shop.addToCart(widget.shop, quantity);
-    showDialog(
-        context: context,
-        builder: (BuildContext context) => const AlertDialog(
-              content: Text('Added to cart'),
-              
-            ));}
+  void addToCartt(BuildContext context) async { // Made async
+    if (quantity > 0) {
+      final shop = context.read<Shop>();
+      try {
+        // Ensure widget.shop.id is not null before calling addToCart
+        if (widget.shop.id == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error: Product ID is missing.')),
+          );
+          return;
+        }
+        await shop.addToCart(widget.shop, quantity); // Use await
+        showDialog(
+          context: context,
+          barrierDismissible: false, // User must tap button!
+          builder: (BuildContext context) => AlertDialog(
+            title: const Text('Success!'),
+            content: const Text('Item added to your cart.'),
+            actions: <Widget>[
+              TextButton(
+                child: const Text('OK'),
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close the dialog
+                },
+              ),
+            ],
+          ),
+        );
+      } catch (e) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) => AlertDialog(
+            title: const Text('Error'),
+            content: Text('Failed to add item to cart: ${e.toString()}'),
+            actions: <Widget>[
+              TextButton(
+                child: const Text('OK'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          ),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a quantity.')),
+      );
+    }
   }
 
   @override
@@ -68,12 +107,24 @@ class _DetiaslScreenState extends State<DetiaslScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 30.0),
             child: Column(
               children: [
-                Image.asset(
-                  widget.shop.imageUrl,
-                  width: 170,
-                  height: 170,
-                  alignment: Alignment.topLeft,
-                ),
+                // Updated Image handling
+                widget.shop.imageUrl.startsWith('http')
+                    ? Image.network(
+                        widget.shop.imageUrl,
+                        width: 170,
+                        height: 170,
+                        fit: BoxFit.contain, // Use contain to see the whole image
+                        errorBuilder: (context, error, stackTrace) =>
+                            Image.asset('assets/images/default.png', width: 170, height: 170, fit: BoxFit.contain),
+                      )
+                    : Image.asset(
+                        widget.shop.imageUrl, // Assuming it could be a local asset path
+                        width: 170,
+                        height: 170,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) =>
+                            Image.asset('assets/images/default.png', width: 170, height: 170, fit: BoxFit.contain),
+                      ),
                 // SizedBox(height: 40,),
                 Row(
                   children: [
@@ -111,9 +162,10 @@ class _DetiaslScreenState extends State<DetiaslScreen> {
                 const SizedBox(
                   height: 10,
                 ),
-                const Text(
-                  ' Made with seasoned rice and a variety of fillings,Delicious and filling rice balls are a Japanese favorite.Delicious and filling rice balls are a Japanese favorite. Made with seasoned rice and a variety of fillings, these handheld delights are perfect for snacking or a light meal. ',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                Text(
+                  widget.shop.description ?? 'No description available.', // Use actual description
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  textAlign: TextAlign.justify,
                 )
               ],
             ),
@@ -136,7 +188,7 @@ class _DetiaslScreenState extends State<DetiaslScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '\$${widget.shop.price}',
+                          '\$${widget.shop.price.toStringAsFixed(2)}', // Updated price display
                           style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -169,7 +221,7 @@ class _DetiaslScreenState extends State<DetiaslScreen> {
                                 ),
                               ),
                             ),
-                            Container(
+                            Container( // Ensure quantity is at least 1 for addToCart logic
                                 height: 40,
                                 width: 40,
                                 decoration: const BoxDecoration(
@@ -191,7 +243,7 @@ class _DetiaslScreenState extends State<DetiaslScreen> {
                     ),
                     CustomButton(
                       text: 'Add To Cart',
-                      onTap: () => addToCartt(context),
+                      onTap: () => addToCartt(context), // Calls the updated function
                       width: 300,
                       height: 50,
                       icon: Icons.arrow_right_alt,

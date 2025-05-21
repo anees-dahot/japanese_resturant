@@ -19,31 +19,37 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Fetch initial data when the screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<Shop>(context, listen: false).fetchProducts();
+      Provider.of<Shop>(context, listen: false).fetchCart(); // Also fetch cart
+    });
+  }
 
-
-
-  void navigateToDetails(BuildContext context, int index) {
-
-    final shop = context.read<Shop>();
-    final foodMenu = shop.foodMenu;
+  void navigateToDetails(BuildContext context, Items foodItem) { // Changed to pass Items object
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => DetiaslScreen(shop: foodMenu[index])),
+      MaterialPageRoute(builder: (context) => DetiaslScreen(shop: foodItem)),
     );
   }
 
-void navigateToCartPage(){
-  Navigator.push(context, MaterialPageRoute(builder: (context)=>  const CartPage()));
-}
-
+  void navigateToCartPage() {
+    Navigator.push(context, MaterialPageRoute(builder: (context) => const CartPage()));
+  }
 
   @override
   Widget build(BuildContext context) {
-      final shop = context.read<Shop>();
-    final foodMenu = shop.foodMenu;
-    return Scaffold(
-      backgroundColor: scaffoldBgColor,
-      appBar: AppBar(
+    // Use Consumer for better reactivity and to access Shop instance
+    return Consumer<Shop>(
+      builder: (context, shop, child) {
+        final foodMenu = shop.foodMenu; // Get foodMenu from shop
+
+        return Scaffold(
+          backgroundColor: scaffoldBgColor,
+          appBar: AppBar(
         title: Text(
           'Tokyo',
           style: GoogleFonts.raleway(
@@ -158,21 +164,26 @@ void navigateToCartPage(){
             const SizedBox(
               height: 15,
             ),
-            SizedBox(
-              height: 200, // You can adjust the height as needed
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: foodMenu.length,
-                itemBuilder: (context, index) {
-                  return GestureDetector(
-                    onTap: () {
-                      navigateToDetails(context, index);
-                    },
-                    child: FoodTile(product: foodMenu[index]),
-                  );
-                },
-              ),
-            ),
+            shop.isLoadingProducts
+                ? const Center(child: CircularProgressIndicator())
+                : shop.productError != null
+                    ? Center(child: Text('Error: ${shop.productError}'))
+                    : SizedBox(
+                        height: 200, // You can adjust the height as needed
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: foodMenu.length,
+                          itemBuilder: (context, index) {
+                            final foodItem = foodMenu[index];
+                            return GestureDetector(
+                              onTap: () {
+                                navigateToDetails(context, foodItem); // Pass Items object
+                              },
+                              child: FoodTile(product: foodItem),
+                            );
+                          },
+                        ),
+                      ),
             const SizedBox(
               height: 20,
             ),
@@ -183,16 +194,21 @@ void navigateToCartPage(){
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: foodMenu.length,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.all(5.0),
-                  child: GestureDetector
-                  (onTap: () => navigateToDetails(context, index),
-                    child: Container(
+            shop.isLoadingProducts
+                ? const Center(child: CircularProgressIndicator()) // Also show loading for popular foods if needed
+                : shop.productError != null
+                    ? Center(child: Text('Error: ${shop.productError}'))
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: foodMenu.length,
+                        itemBuilder: (context, index) {
+                          final foodItem = foodMenu[index];
+                          return Padding(
+                            padding: const EdgeInsets.all(5.0),
+                            child: GestureDetector(
+                              onTap: () => navigateToDetails(context, foodItem), // Pass Items object
+                              child: Container(
                       height: 80,
                       width: 400,
                       decoration: BoxDecoration(
@@ -205,44 +221,60 @@ void navigateToCartPage(){
                             width: 10,
                           ),
                           Image.asset(
-                            foodMenu[index].imageUrl,
-                            width: 60,
-                            height: 60,
-                          ),
-                          const SizedBox(
-                            width: 20,
-                          ),
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                foodMenu[index].name,
-                                style: GoogleFonts.dmSerifDisplay(
-                                  fontSize: 18,
-                                  color: Colors.black,
+                            // Use Image.network if imageUrl is a URL, or handle local assets if it's a path
+                            // Assuming imageUrl might be a network URL from the API
+                            foodItem.imageUrl.startsWith('http')
+                                ? Image.network(
+                                    foodItem.imageUrl,
+                                    width: 60,
+                                    height: 60,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        Image.asset('assets/images/default.png',  width: 60, height: 60, fit: BoxFit.cover), // Fallback
+                                  )
+                                : Image.asset(
+                                    foodItem.imageUrl, // Assuming it could be a local asset path
+                                    width: 60,
+                                    height: 60,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        Image.asset('assets/images/default.png', width: 60, height: 60, fit: BoxFit.cover), // Fallback
+                                  ),
+                            const SizedBox(
+                              width: 20,
+                            ),
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  foodItem.name,
+                                  style: GoogleFonts.dmSerifDisplay(
+                                    fontSize: 18,
+                                    color: Colors.black,
+                                  ),
                                 ),
+                                Text(foodItem.rating) // Assuming rating is still a string
+                              ],
+                            ),
+                            const Spacer(), // Use Spacer to push price to the right
+                            Text(
+                              "\$${foodItem.price.toStringAsFixed(2)}", // Format price
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(width: 20), // Add some padding to the right
+                          ],
+                        ),
                               ),
-                              Text(foodMenu[index].rating)
-                            ],
-                          ),
-                          const SizedBox(
-                            width: 100,
-                          ),
-                          Text(
-                            "\$${foodMenu[index].price}",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          )
-                        ],
+                            ),
+                          );
+                        },
                       ),
-                    ),
-                  ),
-                );
-              },
-            ),
           ],
         ),
       ),
+        );
+      },
     );
   }
 }
